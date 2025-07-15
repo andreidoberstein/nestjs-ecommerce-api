@@ -1,5 +1,12 @@
-import { Controller, Post, Body, UseGuards, Req, Request } from '@nestjs/common';
-import { PaymentsService } from '../../payements/services/payements.service';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Request,
+} from '@nestjs/common';
+import { PaymentsService } from '../services/payments.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import {
   ApiTags,

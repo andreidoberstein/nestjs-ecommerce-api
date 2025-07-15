@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { PaymentsController } from './controllers/payements.controller';
+import { PaymentsController } from './controllers/payments.controller';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaymentsService } from './services/payements.service';
+import { PaymentsService } from './services/payments.service';
 
 @Module({
   controllers: [PaymentsController],

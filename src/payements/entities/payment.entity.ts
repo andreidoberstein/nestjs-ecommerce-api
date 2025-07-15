@@ -1,8 +1,8 @@
 export class PaymentEntity {
-  id: number;
+  id?: number;
   orderId: number;
   amount: number;
   status: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
