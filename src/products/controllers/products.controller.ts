@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
-import { ProductsService } from './products.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ProductsService } from '../services/products.service';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { CreateProductDto } from '../dto/create-product.dto';
+import { UpdateProductDto } from '../dto/update-product.dto';
 
 @ApiTags('products')
 @Controller('products')
@@ -13,8 +15,8 @@ export class ProductsController {
   @ApiOperation({ summary: 'Create a new product (admin only)' })
   @ApiResponse({ status: 201, description: 'Product created' })
   @Post()
-  async create(@Body() body: { name: string; description?: string; price: number; stock: number }, @Req() req) {
-    return this.productsService.create(body, req.user);
+  async create(@Body() dto: CreateProductDto, @Request() req) {
+    return this.productsService.create(dto, req.user);
   }
 
   @ApiOperation({ summary: 'Get all products' })
@@ -36,8 +38,8 @@ export class ProductsController {
   @ApiOperation({ summary: 'Update product (admin only)' })
   @ApiResponse({ status: 200, description: 'Product updated' })
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: { name?: string; description?: string; price?: number; stock?: number }, @Req() req) {
-    return this.productsService.update(parseInt(id), body, req.user);
+  async update(@Param('id') id: string, @Body() dto: UpdateProductDto, @Request() req) {
+    return this.productsService.update(parseInt(id), dto, req.user);
   }
 
   @UseGuards(JwtAuthGuard)
