@@ -1,5 +1,5 @@
 import { Controller, Post, Body, UseGuards, Req, Request } from '@nestjs/common';
-import { PaymentsService } from '../payements.service';
+import { PaymentsService } from '../../payements/services/payements.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import {
   ApiTags,
@@ -20,6 +20,6 @@ export class PaymentsController {
   @ApiResponse({ status: 201, description: 'Payment processed' })
   @Post()
   async create(@Body() dto: CreatePaymentDto, @Request() req) {
-    return this.paymentsService.create(dto.orderId, req.user.userId);
+    return this.paymentsService.create(dto, req.user.userId);
   }
 }
