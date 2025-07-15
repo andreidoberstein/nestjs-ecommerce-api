@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
-import { OrdersService } from './orders.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { CreateOrderDto } from '../dto/create-order.dto';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { OrdersService } from '../services/orders.service';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -13,8 +14,8 @@ export class OrdersController {
   @ApiOperation({ summary: 'Create a new order' })
   @ApiResponse({ status: 201, description: 'Order created' })
   @Post()
-  async create(@Body() body: { items: { productId: number; quantity: number }[] }, @Req() req) {
-    return this.ordersService.create(body, req.user.userId);
+  async create(@Body() dto: CreateOrderDto, @Req() req) {
+    return this.ordersService.create(dto, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
