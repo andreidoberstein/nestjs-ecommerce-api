@@ -1,85 +1,143 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🛒 E-commerce API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST completa para gerenciamento de um sistema de e-commerce, desenvolvida com **NestJS**, **Prisma**, **Docker** e autenticação **JWT**. A aplicação oferece funcionalidades de **cadastro e login de usuários**, **gerenciamento de produtos**, **realização de pedidos** e **pagamentos integrados**, com segurança, escalabilidade e documentação automática via **Swagger**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🚀 Tecnologias Utilizadas
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **NestJS** – Framework escalável para Node.js
+- **Prisma** – ORM moderno e eficiente
+- **PostgreSQL** – Banco de dados relacional
+- **Docker & Docker Compose** – Containerização e orquestração
+- **JWT** – Autenticação com JSON Web Token
+- **Swagger** – Documentação automática e interativa
 
-## Project setup
+---
 
+## 📦 Pré-requisitos
+
+- [Node.js](https://nodejs.org/) v18 ou superior
+- [Docker](https://www.docker.com/)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [Git](https://git-scm.com/)
+
+---
+
+## ⚙️ Como rodar o projeto
+
+### 1. Clone o repositório:
 ```bash
-$ npm install
+git clone <URL_DO_REPOSITORIO>
+cd ecommerce-api
 ```
 
-## Compile and run the project
-
+### 2. Crie o arquivo `.env` com base no `.env.example`:
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+Preencha o conteúdo com suas variáveis:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/ecommerce?schema=public"
+JWT_SECRET="sua-chave-secreta"
+PORT=3000
 ```
 
-## Resources
+### 3. Suba os containers com Docker:
+```bash
+docker-compose up --build
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### 4. Rode as migrations do Prisma:
+```bash
+docker-compose exec app npx prisma migrate dev
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 5. Acesse a documentação Swagger:
+Acesse em seu navegador:
+```
+http://localhost:3000/api
+```
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## 🔐 Autenticação
 
-## Stay in touch
+Utilize o endpoint `/auth/login` para gerar um token JWT. Depois disso, inclua o token no header de requisições autenticadas:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```
+Authorization: Bearer <token>
+```
 
-## License
+---
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 📌 Endpoints principais
+
+### 🔑 Autenticação
+- `POST /auth/register` – Registrar novo usuário
+- `POST /auth/login` – Login e obtenção do token JWT
+
+### 👤 Usuários
+- `GET /users` – Listar usuários (admin)
+- `GET /users/:id` – Detalhar usuário (próprio perfil ou admin)
+
+### 📦 Produtos
+- `POST /products` – Criar produto (admin)
+- `GET /products` – Listar produtos
+- `GET /products/:id` – Detalhar produto
+- `PUT /products/:id` – Atualizar produto (admin)
+- `DELETE /products/:id` – Deletar produto (admin)
+
+### 📦 Pedidos
+- `POST /orders` – Criar pedido (autenticado)
+- `GET /orders` – Listar pedidos do usuário (ou admin)
+- `GET /orders/:id` – Detalhar pedido
+
+### 💳 Pagamentos
+- `POST /payments` – Processar pagamento (autenticado)
+
+---
+
+## 🗂️ Estrutura do projeto
+
+```
+ecommerce-api/
+├── src/
+│   ├── auth/
+│   ├── products/
+│   ├── orders/
+│   ├── payments/
+│   ├── users/
+│   ├── app.module.ts
+│   └── main.ts
+├── prisma/
+│   └── schema.prisma
+├── test/
+│   └── (testes e2e organizados por módulo)
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
+├── package.json
+└── README.md
+```
+
+---
+
+## ✅ Testes End-to-End
+
+Os testes estão localizados na pasta `test/` e cobrem os principais fluxos da aplicação:
+
+```bash
+npm run test:e2e
+```
+
+Utiliza Jest + Supertest para validação real da API em ambiente isolado.
+
+---
+
+## 💡 Autor
+
+Desenvolvido com 💻 por **Andrei Doberstein**
+
+---
