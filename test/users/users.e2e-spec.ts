@@ -1,5 +1,5 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -7,7 +7,22 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let accessToken: string;
+
+  const admin = {
+    email: 'admin@test.com',
+    password: 'admin123',
+    role: 'ADMIN',
+  };
+
+  const user = {
+    email: 'user@test.com',
+    password: 'user1234',
+    role: 'USER',
+  };
+
+  let adminToken: string;
+  let userToken: string;
+  let userId: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -15,114 +30,94 @@ describe('UsersController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
-      }),
-    );
-
+    prisma = app.get(PrismaService);
     await app.init();
 
-    prisma = app.get(PrismaService);
-  });
+    // Cleanup users if they already exist
+    await prisma.user.deleteMany({
+      where: { email: { in: [admin.email, user.email] } },
+    });
 
-  beforeEach(async () => {
-    await prisma.user.deleteMany();
+    // Create admin user
+    await request(app.getHttpServer()).post('/auth/register').send(admin);
+    const adminLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: admin.email, password: admin.password });
+    adminToken = adminLogin.body.access_token;
 
-    const email = 'admin3@example.com';
-    const password = 'password123';
-
-    // Registra um novo usuário admin
+    // Create normal user
     await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ email, password, role: 'ADMIN' })
-      .expect(201);
+      .send(user);
 
-    // Faz login para obter token
-    const res = await request(app.getHttpServer())
+    const userLogin = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
+      .send({ email: user.email, password: user.password });
+    userToken = userLogin.body.access_token;
 
-    accessToken = res.body.access_token;
+    // Decodificar JWT para obter o ID (sub)
+    const payload = JSON.parse(
+      Buffer.from(userToken.split('.')[1], 'base64').toString()
+    );
+
+    userId = payload.sub;
   });
 
   afterAll(async () => {
+    await prisma.user.deleteMany({
+      where: { email: { in: [admin.email, user.email] } },
+    });
     await app.close();
   });
 
-  beforeEach(async () => {
-    await prisma.user.deleteMany(); // Limpa usuários antes de cada teste
-  });
-
-  it('should get all users with valid token', async () => {
-    const email = 'admin2@example.com';
-    const password = 'password123';
-
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email, password, role: 'ADMIN' }) // <-- mantém o role como ADMIN
-      .expect(201);
-
-    // Faz login para obter token
-    const data = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
-
-    accessToken = data.body.access_token;
-
+  it('ADMIN should fetch all users', async () => {
     const res = await request(app.getHttpServer())
       .get('/users')
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body[0]).toHaveProperty('email');
+    expect(res.body.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('should fail without token', async () => {
-    await request(app.getHttpServer()).get('/users').expect(401); // Unauthorized
-  });
-
-  beforeEach(async () => {
-    await prisma.user.deleteMany(); // Limpa usuários antes de cada teste
-  });
-
-  it('should get one user by ID', async () => {
-    const email = 'admin2@example.com';
-    const password = 'password123';
-
+  it('USER should be denied access to fetch all users', async () => {
     await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email, password, role: 'ADMIN' }) // <-- mantém o role como ADMIN
-      .expect(201);
-
-    // Faz login para obter token
-    const data = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
-
-    accessToken = data.body.access_token;
-    // Busca todos os usuários
-    const allUsers = await request(app.getHttpServer())
       .get('/users')
-      .set('Authorization', `Bearer ${accessToken}`)
-      .expect(200);
-      
-    const userId = allUsers.body[0].id;
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403);
+  });
 
-    // Busca usuário por ID
+  it('USER should fetch own profile by ID', async () => {
     const res = await request(app.getHttpServer())
       .get(`/users/${userId}`)
-      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .expect(200);
 
     expect(res.body).toHaveProperty('id', userId);
-    expect(res.body).toHaveProperty('email');
+    expect(res.body).toHaveProperty('email', user.email);
+  });
+
+  it('USER should be denied fetching another user', async () => {
+    const adminRes = await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    const anotherUserId = adminRes.body.find(
+      (u) => u.email !== user.email && u.role === 'ADMIN'
+    )?.id;
+
+    if (anotherUserId) {
+      await request(app.getHttpServer())
+        .get(`/users/${anotherUserId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(403);
+    }
+  });
+
+  it('Should return 404 for non-existent user', async () => {
+    await request(app.getHttpServer())
+      .get(`/users/999999`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
   });
 });

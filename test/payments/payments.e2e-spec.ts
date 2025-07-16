@@ -1,5 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -7,8 +7,16 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 describe('PaymentsController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let token: string;
+  let userToken: string;
+  let userId: number;
   let orderId: number;
+  let productId: number;
+
+  const user = {
+    email: `user${Date.now()}@test.com`,
+    password: 'user1234',
+    role: 'USER',
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -16,39 +24,47 @@ describe('PaymentsController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
+    prisma = app.get(PrismaService);
     await app.init();
 
     // Cria usuário
-    await request(app.getHttpServer())
+    const registerRes = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ email: 'payuser@example.com', password: 'password123' });
+      .send(user);
 
-    // Login
-    const login = await request(app.getHttpServer())
+    userId = registerRes.body.id;
+
+    const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email: 'payuser@example.com', password: 'password123' });
+      .send({ email: user.email, password: user.password });
 
-    token = login.body.access_token;
+    userToken = loginRes.body.access_token;
 
     // Cria produto
     const product = await prisma.product.create({
       data: {
-        name: 'Teclado Mecânico',
-        price: 350.0,
-        stock: 50,
+        name: 'Produto Teste',
+        price: 100,
+        stock: 10,
       },
     });
 
+    productId = product.id;
+
     // Cria pedido
-    const order = await request(app.getHttpServer())
+    const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .send({
-        items: [{ productId: product.id, quantity: 1 }],
+        items: [
+          {
+            productId,
+            quantity: 2,
+          },
+        ],
       });
 
-    orderId = order.body.id;
+    orderId = orderRes.body.id;
   });
 
   afterAll(async () => {
@@ -56,19 +72,28 @@ describe('PaymentsController (e2e)', () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.product.deleteMany();
-    await prisma.user.deleteMany();
+    await prisma.user.deleteMany({ where: { email: user.email } });
     await app.close();
   });
 
-  it('POST /payments - should process a payment for an order', async () => {
-    const response = await request(app.getHttpServer())
+  it('should process payment for a valid order', async () => {
+    const res = await request(app.getHttpServer())
       .post('/payments')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .send({ orderId })
       .expect(201);
 
-    expect(response.body).toHaveProperty('id');
-    expect(response.body.orderId).toBe(orderId);
-    expect(response.body.status).toBe('COMPLETED'); 
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('orderId', orderId);
+    expect(res.body).toHaveProperty('amount');
+    expect(res.body.status).toBe('COMPLETED');
+  });
+
+  it('should fail to pay for non-existent order', async () => {
+    await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ orderId: 999999 })
+      .expect(404);
   });
 });

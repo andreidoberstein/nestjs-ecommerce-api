@@ -16,7 +16,7 @@ export class UsersService implements IUsersService   {
   }
 
   async findOne(id: number, user: any): Promise<UserEntity> {
-    if (user.userId !== id && user.role !== 'ADMIN') {
+    if (user.id !== id && user.role !== 'ADMIN') {
       throw new ForbiddenException('Access denied');
     }
     const userData = await this.prisma.user.findUnique({ where: { id } });

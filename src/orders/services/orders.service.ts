@@ -15,19 +15,24 @@ export class OrdersService implements IOrdersService {
         const product = await this.prisma.product.findUnique({ 
           where: { id: item.productId } 
         });
+
         if (!product || product.stock < item.quantity) {
           throw new NotFoundException(`Product ${item.productId} not found or insufficient stock`);
         }
+
         total += product.price * item.quantity;
+
         // Atualiza o estoque após criar o pedido
         await this.prisma.product.update({
           where: { id: item.productId },
           data: { stock: { decrement: item.quantity } },
         });
+
         return { 
           productId: item.productId, 
           quantity: item.quantity, 
-          price: product.price };
+          price: product.price 
+        };
       }),
     );
     const order = await this.prisma.order.create({

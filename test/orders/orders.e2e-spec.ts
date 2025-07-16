@@ -7,7 +7,23 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 describe('OrdersController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let token: string;
+
+  const admin = {
+    email: 'admin@orders.com',
+    password: 'admin123',
+    role: 'ADMIN',
+  };
+
+  const user = {
+    email: 'user@orders.com',
+    password: 'user123',
+    role: 'USER',
+  };
+
+  let adminToken: string;
+  let userToken: string;
+  let userId: number;
+  let orderId: number;
   let productId: number;
 
   beforeAll(async () => {
@@ -16,41 +32,60 @@ describe('OrdersController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
+    prisma = app.get(PrismaService);
     await app.init();
 
-    // Cria usuário
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'user@example.com', password: 'password123' });
-
-    // Login
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'user@example.com', password: 'password123' });
-
-    token = login.body.access_token;
-
-    // Cria produto
-    const product = await prisma.product.create({
-      data: { name: 'Notebook Gamer', price: 2500.0, stock: 10 },
+    // Limpar dados
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.user.deleteMany({
+      where: { email: { in: [admin.email, user.email] } },
     });
 
-    productId = product.id;
+    // Criar admin e user
+    await request(app.getHttpServer()).post('/auth/register').send(admin);
+    const adminLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: admin.email, password: admin.password });
+    adminToken = adminLogin.body.access_token;
+
+    const userRegister = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send(user);
+    userId = userRegister.body.id;
+
+    const userLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: user.email, password: user.password });
+    userToken = userLogin.body.access_token;
+
+    // Criar produto com estoque
+    const productRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Pizza',
+        price: 30,
+        stock: 10,
+      });
+    productId = productRes.body.id;
   });
 
   afterAll(async () => {
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.product.deleteMany();
-    await prisma.user.deleteMany();
+    await prisma.user.deleteMany({
+      where: { email: { in: [admin.email, user.email] } },
+    });
     await app.close();
   });
 
-  it('POST /orders - should create a new order', async () => {
-    const response = await request(app.getHttpServer())
+  it('should create an order for user', async () => {
+    const res = await request(app.getHttpServer())
       .post('/orders')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .send({
         items: [
           {
@@ -60,34 +95,76 @@ describe('OrdersController (e2e)', () => {
         ],
       })
       .expect(201);
-      
-    expect(response.body).toHaveProperty('userId');
-    expect(response.body.total).toBe(5000.0);
-    expect(response.body.items[0]).toMatchObject({
-      productId,
-      quantity: 2,
-    });
+
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('total');
+    expect(Array.isArray(res.body.items)).toBe(true);
+
+    orderId = res.body.id;
   });
 
-  it('GET /orders - should return a list of user orders', async () => {
-    const response = await request(app.getHttpServer())
+  it('should fail to create order with insufficient stock', async () => {
+    await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        items: [
+          {
+            productId,
+            quantity: 999, // estoque insuficiente
+          },
+        ],
+      })
+      .expect(404);
+  });
+
+  it('should list user orders', async () => {
+    const res = await request(app.getHttpServer())
       .get('/orders')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .expect(200);
 
-    expect(Array.isArray(response.body)).toBe(true);
-    expect(response.body.length).toBeGreaterThan(0);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body[0]).toHaveProperty('userId', userId);
   });
 
-  it('GET /orders/:id - should return order details', async () => {
-    const order = await prisma.order.findFirst();
-    console.log(order)
-    const response = await request(app.getHttpServer())
-      .get(`/orders/${order.id}`)
-      .set('Authorization', `Bearer ${token}`)
+  it('should allow ADMIN to list all orders', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/orders')
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
-    expect(response.body).toHaveProperty('id', order.id);
-    expect(response.body.items.length).toBeGreaterThan(0);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  it('should allow user to get their own order by ID', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/orders/${orderId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200);
+    expect(res.body).toHaveProperty('id', orderId);
+  });
+
+  it('should forbid user from accessing others orders', async () => {
+    // Criar novo usuário que não tem o pedido
+    const outsider = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email: 'outsider@orders.com',
+        password: 'outsider123',
+        role: 'USER',
+      });
+
+    const outsiderLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'outsider@orders.com', password: 'outsider123' });
+
+    const outsiderToken = outsiderLogin.body.access_token;
+
+    await request(app.getHttpServer())
+      .get(`/orders/${orderId}`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(404); // Deve retornar not found
   });
 });

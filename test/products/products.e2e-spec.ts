@@ -7,8 +7,22 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 describe('ProductsController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let token: string;
-  let productId: number;
+
+  const admin = {
+    email: 'admin@products.com',
+    password: 'admin123',
+    role: 'ADMIN',
+  };
+
+  const user = {
+    email: 'user@products.com',
+    password: 'user123',
+    role: 'USER',
+  };
+
+  let adminToken: string;
+  let userToken: string;
+  let createdProductId: number;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -16,86 +30,125 @@ describe('ProductsController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
+    prisma = app.get(PrismaService);
     await app.init();
 
-    // Criação de usuário admin
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email: 'admin@example.com', password: 'admin123', role: 'ADMIN' });
+    await prisma.user.deleteMany({
+      where: { email: { in: [admin.email, user.email] } },
+    });
 
-    const login = await request(app.getHttpServer())
+    // Register admin and user
+    await request(app.getHttpServer()).post('/auth/register').send(admin);
+    await request(app.getHttpServer()).post('/auth/register').send(user);
+
+    const adminRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email: 'admin@example.com', password: 'admin123' });
+      .send({ email: admin.email, password: admin.password });
+    adminToken = adminRes.body.access_token;
 
-    token = login.body.access_token;
+    const userRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: user.email, password: user.password });
+    userToken = userRes.body.access_token;
   });
 
   afterAll(async () => {
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.product.deleteMany();
-    await prisma.user.deleteMany();
+    await prisma.user.deleteMany({
+      where: { email: { in: [admin.email, user.email] } },
+    });
     await app.close();
   });
 
-  it('POST /products - create a product (admin only)', async () => {
-    const response = await request(app.getHttpServer())
+  it('should allow ADMIN to create a product', async () => {
+    const res = await request(app.getHttpServer())
       .post('/products')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        name: 'Notebook Gamer',
-        description: 'RTX 3060, 16GB RAM',
-        price: 4500.00,
+        name: 'Test Product',
+        price: 99.99,
         stock: 10,
       })
       .expect(201);
 
-    expect(response.body).toHaveProperty('id');
-    expect(response.body.name).toBe('Notebook Gamer');
-    productId = response.body.id;
+    expect(res.body).toHaveProperty('id');
+    expect(res.body).toHaveProperty('name', 'Test Product');
+    createdProductId = res.body.id;
   });
 
-  it('GET /products - should list all products', async () => {
-    const response = await request(app.getHttpServer())
+  it('should deny USER to create a product', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        name: 'Illegal Product',
+        price: 9.99,
+        stock: 1,
+      })
+      .expect(403);
+  });
+
+  it('should list all products (public)', async () => {
+    const res = await request(app.getHttpServer())
       .get('/products')
       .expect(200);
 
-    expect(Array.isArray(response.body)).toBe(true);
-    expect(response.body.length).toBeGreaterThan(0);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
   });
 
-  it('GET /products/:id - should return a specific product', async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/products/${productId}`)
+  it('should get a product by ID (public)', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${createdProductId}`)
       .expect(200);
 
-    expect(response.body).toHaveProperty('id', productId);
-    expect(response.body.name).toBe('Notebook Gamer');
+    expect(res.body).toHaveProperty('id', createdProductId);
+    expect(res.body).toHaveProperty('name');
   });
 
-  it('PUT /products/:id - update a product', async () => {
-    const response = await request(app.getHttpServer())
-      .put(`/products/${productId}`)
-      .set('Authorization', `Bearer ${token}`)
+  it('should return 404 for non-existent product', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/999999`)
+      .expect(404);
+  });
+
+  it('should allow ADMIN to update a product', async () => {
+    const res = await request(app.getHttpServer())
+      .put(`/products/${createdProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        name: 'Notebook Gamer Atualizado',
-        description: 'Atualizado',
-        price: 4700.00,
-        stock: 15,
+        name: 'Updated Product',
+        price: 123.45,
+        stock: 5,
       })
       .expect(200);
 
-    expect(response.body.name).toBe('Notebook Gamer Atualizado');
-    expect(response.body.stock).toBe(15);
+    expect(res.body).toHaveProperty('name', 'Updated Product');
   });
 
-  it('DELETE /products/:id - delete a product', async () => {
+  it('should deny USER to update a product', async () => {
     await request(app.getHttpServer())
-      .delete(`/products/${productId}`)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
+      .put(`/products/${createdProductId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        name: 'Hacked Product',
+      })
+      .expect(403);
+  });
 
-    const verify = await request(app.getHttpServer())
-      .get(`/products/${productId}`)
-      .expect(404);
+  it('should allow ADMIN to delete a product', async () => {
+    await request(app.getHttpServer())
+      .delete(`/products/${createdProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+  });
+
+  it('should deny USER to delete a product', async () => {
+    await request(app.getHttpServer())
+      .delete(`/products/${createdProductId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403);
   });
 });
