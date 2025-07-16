@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserEntity } from '../entities/user.entity';
 import { IUsersService } from '../interfaces/users-service.interface';
+import { UpdateUserDto } from '../dto/update-user.dto';
 
 @Injectable()
 export class UsersService implements IUsersService   {
@@ -23,5 +24,12 @@ export class UsersService implements IUsersService   {
       throw new NotFoundException('User not found');
     }
     return userData;
+  }
+
+  async update(id: number, dto: UpdateUserDto, user: any): Promise<UserEntity> {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException('Access denied');
+    }
+    return this.prisma.user.update({ where: { id }, data: dto });
   }
 }

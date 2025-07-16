@@ -38,7 +38,6 @@ export class OrdersService implements IOrdersService {
       },
       include: { items: true },
     });
-
     return order;
   }
 

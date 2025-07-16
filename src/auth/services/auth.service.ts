@@ -16,10 +16,9 @@ export class AuthService implements IAuthService {
 
   async register(dto: RegisterDto): Promise<AuthEntity> {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
-      data: { email: dto.email, password: hashedPassword },
-    });
-    return { id: user.id, email: user.email, role: user.role };
+    dto = {...dto, password: hashedPassword}
+    const user = await this.prisma.user.create({ data: dto });
+    return { id: user.id, email: user.email, role: user.role }
   }
 
   async login(dto: LoginDto): Promise<AuthEntity> {

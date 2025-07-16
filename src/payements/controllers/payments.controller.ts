@@ -27,6 +27,6 @@ export class PaymentsController {
   @ApiResponse({ status: 201, description: 'Payment processed' })
   @Post()
   async create(@Body() dto: CreatePaymentDto, @Request() req) {
-    return this.paymentsService.create(dto, req.user.userId);
+    return this.paymentsService.create(dto, req.user.id);
   }
 }

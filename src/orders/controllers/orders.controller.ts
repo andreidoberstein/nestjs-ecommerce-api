@@ -15,7 +15,7 @@ export class OrdersController {
   @ApiResponse({ status: 201, description: 'Order created' })
   @Post()
   async create(@Body() dto: CreateOrderDto, @Req() req) {
-    return this.ordersService.create(dto, req.user.userId);
+    return this.ordersService.create(dto, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -24,7 +24,7 @@ export class OrdersController {
   @ApiResponse({ status: 200, description: 'List of orders' })
   @Get()
   async findAll(@Req() req) {
-    return this.ordersService.findAll(req.user.userId, req.user.role);
+    return this.ordersService.findAll(req.user.id, req.user.role);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -33,6 +33,6 @@ export class OrdersController {
   @ApiResponse({ status: 200, description: 'Order details' })
   @Get(':id')
   async findOne(@Param('id') id: string, @Req() req) {
-    return this.ordersService.findOne(parseInt(id), req.user.userId, req.user.role);
+    return this.ordersService.findOne(parseInt(id), req.user.id, req.user.role);
   }
 }
